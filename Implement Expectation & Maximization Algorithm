@@ -1,0 +1,104 @@
+import numpy as np
+
+class GaussianMixtureModel:
+    def __init__(self, n_components, max_iter=100, tol=1e-4):
+        self.n_components = n_components
+        self.max_iter = max_iter
+        self.tol = tol
+        self.means_ = None
+        self.covs_ = None
+        self.weights_ = None
+        self.log_likelihoods_ = []
+
+    def _initialize_parameters(self, X):
+        """Initialize means, covariances, and mixing weights."""
+        n_samples, n_features = X.shape
+        random_idx = np.random.choice(n_samples, self.n_components, replace=False)
+        self.means_ = X[random_idx]
+        self.covs_ = np.array([np.cov(X.T) for _ in range(self.n_components)])
+        self.weights_ = np.ones(self.n_components) / self.n_components
+
+    def _gaussian(self, X, mean, cov):
+        """Compute Gaussian probability density."""
+        n_features = X.shape[1]
+        diff = X - mean
+        inv_cov = np.linalg.inv(cov)
+        det_cov = np.linalg.det(cov)
+        exponent = -0.5 * np.sum(diff @ inv_cov * diff, axis=1)
+        return np.exp(exponent) / np.sqrt((2 * np.pi) ** n_features * det_cov)
+
+    def _e_step(self, X):
+        """Expectation step: compute responsibilities."""
+        n_samples = X.shape[0]
+        responsibilities = np.zeros((n_samples, self.n_components))
+        
+        for k in range(self.n_components):
+            responsibilities[:, k] = self.weights_[k] * self._gaussian(X, self.means_[k], self.covs_[k])
+        
+        responsibilities_sum = responsibilities.sum(axis=1, keepdims=True)
+        responsibilities_sum = np.where(responsibilities_sum == 0, 1e-10, responsibilities_sum)  # Avoid division by zero
+        responsibilities /= responsibilities_sum
+        
+        return responsibilities
+
+    def _m_step(self, X, responsibilities):
+        """Maximization step: update parameters."""
+        n_samples = X.shape[0]
+        
+        Nk = responsibilities.sum(axis=0)
+        self.weights_ = Nk / n_samples
+        
+        self.means_ = np.zeros_like(self.means_)
+        for k in range(self.n_components):
+            self.means_[k] = np.sum(responsibilities[:, k][:, np.newaxis] * X, axis=0) / Nk[k]
+        
+        self.covs_ = np.zeros_like(self.covs_)
+        for k in range(self.n_components):
+            diff = X - self.means_[k]
+            self.covs_[k] = np.dot(responsibilities[:, k] * diff.T, diff) / Nk[k]
+            self.covs_[k] += 1e-6 * np.eye(X.shape[1])  # Regularization to avoid singular matrices
+
+    def _log_likelihood(self, X):
+        """Compute log likelihood of the data."""
+        n_samples = X.shape[0]
+        likelihood = np.zeros(n_samples)
+        for k in range(self.n_components):
+            likelihood += self.weights_[k] * self._gaussian(X, self.means_[k], self.covs_[k])
+        return np.sum(np.log(likelihood + 1e-10))  # Avoid log(0)
+
+    def fit(self, X):
+        """Fit the model using EM algorithm."""
+        self._initialize_parameters(X)
+        
+        for iteration in range(self.max_iter):
+            responsibilities = self._e_step(X)
+            
+            self._m_step(X, responsibilities)
+            
+            log_likelihood = self._log_likelihood(X)
+            self.log_likelihoods_.append(log_likelihood)
+            
+            if iteration > 0 and abs(self.log_likelihoods_[-1] - self.log_likelihoods_[-2]) < self.tol:
+                break
+        
+        return self
+
+    def predict(self, X):
+        """Predict cluster labels."""
+        responsibilities = self._e_step(X)
+        return np.argmax(responsibilities, axis=1)
+
+if __name__ == "__main__":
+    np.random.seed(42)
+    n_samples = 300
+    X1 = np.random.multivariate_normal([0, 0], [[1, 0.5], [0.5, 1]], n_samples // 3)
+    X2 = np.random.multivariate_normal([5, 5], [[1.5, -0.5], [-0.5, 1.5]], n_samples // 3)
+    X3 = np.random.multivariate_normal([-3, 4], [[1, 0], [0, 1]], n_samples // 3)
+    X = np.vstack([X1, X2, X3])
+    
+    gmm = GaussianMixtureModel(n_components=3)
+    gmm.fit(X)
+    
+    labels = gmm.predict(X)
+    print("Cluster assignments:", labels[:10])
+    print("Log likelihoods:", gmm.log_likelihoods_[-1])
