@@ -1,0 +1,65 @@
+import numpy as np
+import pandas as pd
+from sklearn.datasets import load_iris
+from sklearn.model_selection import train_test_split, cross_val_score
+from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import LogisticRegression
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.svm import SVC
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.naive_bayes import GaussianNB
+from sklearn.metrics import accuracy_score, classification_report
+
+iris = load_iris()
+X = iris.data
+y = iris.target
+
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+scaler = StandardScaler()
+X_train = scaler.fit_transform(X_train)
+X_test = scaler.transform(X_test)
+
+classifiers = {
+    'Logistic Regression': LogisticRegression(random_state=42, max_iter=200),
+    'K-Nearest Neighbors': KNeighborsClassifier(n_neighbors=5),
+    'Support Vector Machine': SVC(random_state=42),
+    'Random Forest': RandomForestClassifier(n_estimators=100, random_state=42),
+    'Naive Bayes': GaussianNB()
+}
+
+results = {
+    'Classifier': [],
+    'Accuracy': [],
+    'Precision (weighted)': [],
+    'Recall (weighted)': [],
+    'F1-score (weighted)': [],
+    'Cross-Validation Accuracy (mean)': [],
+    'Cross-Validation Accuracy (std)': []
+}
+
+for name, clf in classifiers.items():
+    clf.fit(X_train, y_train)
+    
+    y_pred = clf.predict(X_test)
+    
+    accuracy = accuracy_score(y_test, y_pred)
+    report = classification_report(y_test, y_pred, output_dict=True, zero_division=0)
+    
+    cv_scores = cross_val_score(clf, X, y, cv=5, scoring='accuracy')
+    
+    results['Classifier'].append(name)
+    results['Accuracy'].append(accuracy)
+    results['Precision (weighted)'].append(report['weighted avg']['precision'])
+    results['Recall (weighted)'].append(report['weighted avg']['recall'])
+    results['F1-score (weighted)'].append(report['weighted avg']['f1-score'])
+    results['Cross-Validation Accuracy (mean)'].append(cv_scores.mean())
+    results['Cross-Validation Accuracy (std)'].append(cv_scores.std())
+
+results_df = pd.DataFrame(results)
+
+print("Performance Comparison of Classification Algorithms on Iris Dataset:\n")
+print(results_df.to_string(index=False))
+
+best_classifier = results_df.loc[results_df['Accuracy'].idxmax()]['Classifier']
+print(f"\nBest Classifier (based on test set accuracy): {best_classifier}")
