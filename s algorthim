@@ -1,0 +1,36 @@
+Implement and demonstrate the FIND-S algorithm for finding the most specific hypothesis based on a given set of training data samples. 
+def find_s_algorithm(examples):
+    """
+    Function to implement the Find-S algorithm.
+    
+    :param examples: List of tuples, where each tuple is (attributes, label)
+                     attributes: list of attribute values
+                     label: 'Yes' for positive example, 'No' for negative example
+    :return: Most specific hypothesis
+    """
+    for attributes, label in examples:
+        if label == 'Yes':
+            hypothesis = attributes.copy()
+            break
+    else:
+        return None  
+
+    for attributes, label in examples:
+        if label == 'Yes':
+            for i in range(len(hypothesis)):
+                if hypothesis[i] != attributes[i]:
+                    hypothesis[i] = '?'
+    
+    return hypothesis
+
+
+if __name__ == "__main__":
+    training_data = [
+        (['Sunny', 'Warm', 'Normal', 'Strong', 'Warm', 'Same'], 'Yes'),
+        (['Sunny', 'Warm', 'High', 'Strong', 'Warm', 'Same'], 'Yes'),
+        (['Rainy', 'Cold', 'High', 'Strong', 'Warm', 'Change'], 'No'),
+        (['Sunny', 'Warm', 'High', 'Strong', 'Cool', 'Change'], 'Yes')
+    ]
+
+    final_hypothesis = find_s_algorithm(training_data)
+    print("Final Hypothesis:", final_hypothesis)
