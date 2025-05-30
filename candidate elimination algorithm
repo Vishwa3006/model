@@ -1,0 +1,81 @@
+def is_consistent(hypothesis, example):
+    return all(h == e or h == '?' for h, e in zip(hypothesis, example))
+
+def more_general(h1, h2):
+    return all(h1[i] == '?' or h1[i] == h2[i] for i in range(len(h1)))
+
+def min_generalizations(h, x):
+    new_h = h[:]
+    for i in range(len(h)):
+        if h[i] != x[i]:
+            new_h[i] = '?'
+    return new_h
+
+def min_specializations(h, domains, x):
+    results = []
+    for i in range(len(h)):
+        if h[i] == '?':
+            for val in domains[i]:
+                if val != x[i]:
+                    new_h = h[:]
+                    new_h[i] = val
+                    results.append(new_h)
+        elif h[i] != x[i]:
+            continue
+        else:
+            new_h = h[:]
+            new_h[i] = '?'
+            results.append(new_h)
+    return results
+
+def candidate_elimination(examples, domains):
+    for x, y in examples:
+        if y == 'Yes':
+            S = x[:]
+            break
+    else:
+        raise ValueError("No positive examples provided.")
+
+    G = [['?' for _ in range(len(S))]]
+
+    for x, y in examples:
+        if y == 'Yes':  # positive example
+            G = [g for g in G if is_consistent(g, x)]
+
+            S = min_generalizations(S, x)
+
+            G = [g for g in G if more_general(g, S)]
+
+        elif y == 'No':  # negative example
+            G_new = []
+            for g in G:
+                if is_consistent(g, x):
+                    G_new.extend(min_specializations(g, domains, x))
+                else:
+                    G_new.append(g)
+            G = [h for h in G_new if is_consistent(h, S) and more_general(h, S)]
+
+    return S, G
+
+if __name__ == "__main__":
+    examples = [
+        (['Sunny', 'Warm', 'Normal', 'Strong', 'Warm', 'Same'], 'Yes'),
+        (['Sunny', 'Warm', 'High', 'Strong', 'Warm', 'Same'], 'Yes'),
+        (['Rainy', 'Cold', 'High', 'Strong', 'Warm', 'Change'], 'No'),
+        (['Sunny', 'Warm', 'High', 'Strong', 'Cool', 'Change'], 'Yes')
+    ]
+
+    domains = [
+        ['Sunny', 'Rainy'],
+        ['Warm', 'Cold'],
+        ['Normal', 'High'],
+        ['Strong', 'Weak'],
+        ['Warm', 'Cool'],
+        ['Same', 'Change']
+    ]
+
+    S_final, G_final = candidate_elimination(examples, domains)
+    print("Final Specific Hypothesis S:", S_final)
+    print("Final General Hypotheses G:")
+    for g in G_final:
+        print(g)
